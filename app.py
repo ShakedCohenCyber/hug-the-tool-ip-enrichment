@@ -32,7 +32,15 @@ st.markdown(
     html, body, [data-testid="stAppViewContainer"], .stApp {
         height: 100vh;
         overflow: hidden;
-        background: #c0c0c0;
+        background-color: #b9c4d4;
+        background-image:
+            radial-gradient(circle at 12% 18%, rgba(0, 255, 255, 0.42) 0 2px, transparent 3px),
+            radial-gradient(circle at 88% 72%, rgba(255, 0, 255, 0.28) 0 2px, transparent 3px),
+            linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+            linear-gradient(135deg, #aab5c8 0%, #e6f7ff 38%, #a6b0c3 70%, #d9c9ff 100%);
+        background-size: 83px 83px, 109px 109px, 24px 24px, 24px 24px, cover;
+        background-attachment: fixed;
         color: #000080;
         font-family: Verdana, Arial, sans-serif;
     }
@@ -377,7 +385,7 @@ def investigation_export(payload: dict[str, Any]) -> str:
 
 st.markdown('<div class="retro-title">HUG-THE-TOOL :: IP ENRICHMENT CONSOLE</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="retro-subtitle">Fast pivots. Clear signals. Better investigations.</div>',
+    '<div class="retro-subtitle">It doesn&#39;t bite.</div>',
     unsafe_allow_html=True,
 )
 
