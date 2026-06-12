@@ -376,7 +376,7 @@ with st.form("ip_lookup", clear_on_submit=False):
         submitted = st.form_submit_button("RUN TRIAGE", use_container_width=True)
     vt_column, abuse_column, otx_column, vpn_column = st.columns(4)
     with vt_column:
-        use_vt = st.checkbox("VirusTotal", value=True)
+        use_vt = st.checkbox("VirusTotal", value=False)
     with abuse_column:
         use_abuse = st.checkbox("AbuseIPDB", value=True)
     with otx_column:
