@@ -13,5 +13,6 @@ Single-page Streamlit application for public IP enrichment and OSINT triage.
 Deploy `app.py` from this repository with Streamlit Community Cloud, then add the
 same four keys through the app's **Settings > Secrets** panel.
 
-The app does not log, cache, or persist queried IP addresses. Internal and non-routable
-addresses are rejected locally before external API calls are made.
+The app does not log or persist queried IP addresses. Results are held in a five-minute
+in-memory cache to protect API quotas. Internal and non-routable addresses are rejected
+locally before external API calls are made.

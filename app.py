@@ -139,6 +139,15 @@ st.markdown(
         color: #505050;
         font-weight: bold;
     }
+    .pivot-link {
+        float: right;
+        color: #0000ee;
+        font: bold 10px Verdana, sans-serif;
+        text-decoration: underline;
+    }
+    .pivot-link:visited {
+        color: #551a8b;
+    }
     [data-testid="stCodeBlock"] {
         border: 2px inset #fff;
         border-radius: 0;
@@ -276,15 +285,16 @@ def query_vpnapi(ip: str, api_key: str | None) -> dict[str, Any]:
     )
 
 
+@st.cache_data(ttl=300, max_entries=256, show_spinner=False)
 def run_enrichment(
     ip: str,
-    ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address,
-    selected_apis: set[str],
+    ip_version: int,
+    selected_apis: tuple[str, ...],
 ) -> dict[str, dict[str, Any]]:
     all_jobs = {
         "vt": lambda: (query_virustotal, (ip, secret("VT_API_KEY"))),
         "abuse": lambda: (query_abuseipdb, (ip, secret("ABUSE_API_KEY"))),
-        "otx": lambda: (query_otx, (ip, ip_obj.version, secret("OTX_API_KEY"))),
+        "otx": lambda: (query_otx, (ip, ip_version, secret("OTX_API_KEY"))),
         "vpn": lambda: (query_vpnapi, (ip, secret("VPNAPI_KEY"))),
     }
     jobs = {name: all_jobs[name]() for name in selected_apis}
@@ -328,7 +338,12 @@ def status_text(result: dict[str, Any]) -> str:
     return f'<span class="bad">Data Unavailable ({safe_text(result["reason"])})</span>'
 
 
-def source_card(title: str, result: dict[str, Any], lines: list[tuple[str, Any]]) -> str:
+def source_card(
+    title: str,
+    result: dict[str, Any],
+    lines: list[tuple[str, Any]],
+    pivot_url: str,
+) -> str:
     if result["reason"] == "Not Selected":
         details = "Skipped by analyst"
     else:
@@ -339,7 +354,10 @@ def source_card(title: str, result: dict[str, Any], lines: list[tuple[str, Any]]
     return (
         '<div class="source-card">'
         f'<div class="source-title">{safe_text(title)}</div>'
-        f"{status_text(result)}<br>{details}"
+        f"{status_text(result)}"
+        f'<a class="pivot-link" href="{html.escape(pivot_url, quote=True)}" '
+        'target="_blank" rel="noopener noreferrer">[OPEN WEB]</a>'
+        f"<br>{details}"
         "</div>"
     )
 
@@ -359,7 +377,7 @@ def investigation_export(payload: dict[str, Any]) -> str:
 
 st.markdown('<div class="retro-title">HUG-THE-TOOL :: IP ENRICHMENT CONSOLE</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="retro-subtitle">Four-source OSINT triage / no query logging, caching, or persistence</div>',
+    '<div class="retro-subtitle">Four-source OSINT triage / no query logging or persistence / 5-minute memory cache</div>',
     unsafe_allow_html=True,
 )
 
@@ -397,16 +415,16 @@ if not submitted:
     )
     st.stop()
 
-selected_apis = {
+selected_apis = tuple(
     name
-    for name, enabled in {
-        "vt": use_vt,
-        "abuse": use_abuse,
-        "otx": use_otx,
-        "vpn": use_vpn,
-    }.items()
+    for name, enabled in (
+        ("vt", use_vt),
+        ("abuse", use_abuse),
+        ("otx", use_otx),
+        ("vpn", use_vpn),
+    )
     if enabled
-}
+)
 if not selected_apis:
     st.warning("Select at least one API")
     st.stop()
@@ -433,7 +451,15 @@ spinner_sources = " / ".join(
     selected_names[name] for name in ("vt", "abuse", "otx", "vpn") if name in selected_apis
 )
 with st.spinner(f"CONTACTING {spinner_sources} ..."):
-    api_results = run_enrichment(ip_address, ip_object, selected_apis)
+    api_results = run_enrichment(ip_address, ip_object.version, selected_apis)
+
+encoded_ip = quote(ip_address, safe="")
+pivot_urls = {
+    "vt": f"https://www.virustotal.com/gui/ip-address/{encoded_ip}",
+    "abuse": f"https://www.abuseipdb.com/check/{encoded_ip}",
+    "otx": f"https://otx.alienvault.com/indicator/ip/{encoded_ip}",
+    "vpn": "https://vpnapi.io/vpn-detection",
+}
 
 vt_result = api_results["vt"]
 abuse_result = api_results["abuse"]
@@ -502,6 +528,7 @@ with sources_column:
                     ("Suspicious", value(vt_stats, "suspicious")),
                     ("AS Owner", value(vt_attributes, "as_owner")),
                 ],
+                pivot_urls["vt"],
             ),
             unsafe_allow_html=True,
         )
@@ -515,6 +542,7 @@ with sources_column:
                     ("Total Reports", abuse.get("totalReports", "Data Unavailable")),
                     ("ISP", provider),
                 ],
+                pivot_urls["abuse"],
             ),
             unsafe_allow_html=True,
         )
@@ -528,6 +556,7 @@ with sources_column:
                     ("Reputation", otx_reputation),
                     ("Indicator", ip_address),
                 ],
+                pivot_urls["otx"],
             ),
             unsafe_allow_html=True,
         )
@@ -541,6 +570,7 @@ with sources_column:
                     ("Proxy", value(vpn_security, "proxy")),
                     ("TOR", value(vpn_security, "tor")),
                 ],
+                pivot_urls["vpn"],
             ),
             unsafe_allow_html=True,
         )
