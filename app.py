@@ -469,11 +469,12 @@ vpn = (
     else {"vpn": "Data Unavailable"}
 )
 score = abuse.get("abuseConfidenceScore", "Data Unavailable")
+score_display = f"{score}%" if isinstance(score, (int, float)) else score
 provider = abuse.get("isp", "Data Unavailable")
 
 payload = {
     "IP Address": ip_address,
-    "Abuse Score": score,
+    "Abuse Score": score_display,
     "ISP / Provider": provider,
     "Country": abuse.get("countryName", "Unknown"),
     "Total Reports": abuse.get("totalReports", 0),
@@ -510,7 +511,7 @@ with sources_column:
                 "ABUSEIPDB v2",
                 abuse_result,
                 [
-                    ("Abuse Score", score),
+                    ("Abuse Score", score_display),
                     ("Total Reports", abuse.get("totalReports", "Data Unavailable")),
                     ("ISP", provider),
                 ],
