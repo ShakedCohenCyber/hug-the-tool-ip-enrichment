@@ -96,6 +96,13 @@ st.markdown(
         color: #000;
         font: bold 11px Verdana, sans-serif;
     }
+    [data-testid="stCheckbox"] label:has(input:checked) > span {
+        background-color: #000080 !important;
+        border-color: #000080 !important;
+    }
+    [data-testid="stCheckbox"] label:has(input:focus-visible) > span {
+        box-shadow: 0 0 0 2px #00ffff !important;
+    }
     .stButton > button, [data-testid="stFormSubmitButton"] button {
         min-height: 34px;
         border: 2px outset #fff;
