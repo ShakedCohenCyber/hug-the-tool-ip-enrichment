@@ -377,7 +377,7 @@ def investigation_export(payload: dict[str, Any]) -> str:
 
 st.markdown('<div class="retro-title">HUG-THE-TOOL :: IP ENRICHMENT CONSOLE</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="retro-subtitle">Four-source OSINT triage / no query logging or persistence / 5-minute memory cache</div>',
+    '<div class="retro-subtitle">Fast pivots. Clear signals. Better investigations.</div>',
     unsafe_allow_html=True,
 )
 
