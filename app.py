@@ -347,7 +347,7 @@ def source_card(title: str, result: dict[str, Any], lines: list[tuple[str, Any]]
 def investigation_export(payload: dict[str, Any]) -> str:
     """Create a clean analyst-ready export containing only useful values."""
     unavailable_values = {"", "data unavailable", "unknown", "n/a", "none", "null"}
-    relevant_lines = []
+    relevant_lines = ["Intelligence:"]
     for field, raw_value in payload.items():
         if raw_value is None:
             continue
