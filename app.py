@@ -93,8 +93,11 @@ st.markdown(
         min-height: 25px;
     }
     [data-testid="stCheckbox"] label {
-        color: #000;
+        color: #000080 !important;
         font: bold 11px Verdana, sans-serif;
+    }
+    [data-testid="stCheckbox"] label p {
+        color: #000080 !important;
     }
     [data-testid="stCheckbox"] label:has(input:checked) > span {
         background-color: #000080 !important;
