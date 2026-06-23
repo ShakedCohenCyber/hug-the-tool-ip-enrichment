@@ -313,6 +313,17 @@ def query_ipinfo(ip: str, api_key: str | None) -> dict[str, Any]:
     )
 
 
+def query_ipapi_is(ip: str, api_key: str | None) -> dict[str, Any]:
+    params: dict[str, Any] = {"q": ip}
+    if api_key:
+        params["key"] = api_key
+    return request_json(
+        "https://api.ipapi.is",
+        params=params,
+        headers={"Accept": "application/json"},
+    )
+
+
 @st.cache_data(ttl=300, max_entries=256, show_spinner=False)
 def run_enrichment(
     ip: str,
@@ -325,6 +336,7 @@ def run_enrichment(
         "otx": lambda: (query_otx, (ip, ip_version, secret("OTX_API_KEY"))),
         "vpn": lambda: (query_vpnapi, (ip, secret("VPNAPI_KEY"))),
         "ipinfo": lambda: (query_ipinfo, (ip, secret("IPINFO_TOKEN"))),
+        "ipapiis": lambda: (query_ipapi_is, (ip, secret("IPAPI_IS_KEY"))),
     }
     jobs = {name: all_jobs[name]() for name in selected_apis}
     results = {
@@ -426,17 +438,19 @@ with st.form("ip_lookup", clear_on_submit=False):
         )
     with button_column:
         submitted = st.form_submit_button("RUN TRIAGE", use_container_width=True)
-    vt_column, abuse_column, otx_column, vpn_column, ipinfo_column = st.columns(5)
-    with vt_column:
-        use_vt = st.checkbox("VirusTotal", value=False)
+    abuse_column, vt_column, otx_column, vpn_column, ipapiis_column, ipinfo_column = st.columns(6)
     with abuse_column:
         use_abuse = st.checkbox("AbuseIPDB", value=True)
+    with vt_column:
+        use_vt = st.checkbox("VirusTotal", value=False)
     with otx_column:
-        use_otx = st.checkbox("AlienVault OTX", value=True)
+        use_otx = st.checkbox("AlienVault OTX", value=False)
     with vpn_column:
-        use_vpn = st.checkbox("VPNAPI.io", value=True)
+        use_vpn = st.checkbox("VPNAPI.io", value=False)
+    with ipapiis_column:
+        use_ipapiis = st.checkbox("ipapi.is", value=False)
     with ipinfo_column:
-        use_ipinfo = st.checkbox("IPInfo.io", value=True)
+        use_ipinfo = st.checkbox("IPInfo.io", value=False)
 
 if not submitted:
     st.markdown(
@@ -459,6 +473,7 @@ selected_apis = tuple(
         ("otx", use_otx),
         ("vpn", use_vpn),
         ("ipinfo", use_ipinfo),
+        ("ipapiis", use_ipapiis),
     )
     if enabled
 )
@@ -484,9 +499,10 @@ selected_names = {
     "otx": "OTX",
     "vpn": "VPNAPI",
     "ipinfo": "IPINFO",
+    "ipapiis": "IPAPI.IS",
 }
 spinner_sources = " / ".join(
-    selected_names[name] for name in ("vt", "abuse", "otx", "vpn", "ipinfo") if name in selected_apis
+    selected_names[name] for name in ("vt", "abuse", "otx", "vpn", "ipinfo", "ipapiis") if name in selected_apis
 )
 with st.spinner(f"CONTACTING {spinner_sources} ..."):
     api_results = run_enrichment(ip_address, ip_object.version, selected_apis)
@@ -499,6 +515,7 @@ pivot_urls = {
     "vpn": "https://vpnapi.io/vpn-detection",
     "ipinfo": f"https://ipinfo.io/{encoded_ip}",
     "spur": f"https://spur.us/context/{encoded_ip}",
+    "ipapiis": f"https://ipapi.is/?q={encoded_ip}",
 }
 
 vt_result = api_results["vt"]
@@ -506,6 +523,7 @@ abuse_result = api_results["abuse"]
 otx_result = api_results["otx"]
 vpn_result = api_results["vpn"]
 ipinfo_result = api_results["ipinfo"]
+ipapiis_result = api_results["ipapiis"]
 
 vt_data = vt_result["data"].get("data", {}) if vt_result["ok"] else {}
 vt_attributes = vt_data.get("attributes", {}) if isinstance(vt_data, dict) else {}
@@ -520,6 +538,7 @@ ipinfo_data = ipinfo_result["data"] if ipinfo_result["ok"] else {}
 ipinfo_privacy = ipinfo_data.get("privacy", {}) if isinstance(ipinfo_data, dict) else {}
 if not isinstance(ipinfo_privacy, dict):
     ipinfo_privacy = {}
+ipapiis_data = ipapiis_result["data"] if ipapiis_result["ok"] else {}
 
 if abuse_result["ok"]:
     abuse = dict(abuse_result["data"])
@@ -546,16 +565,21 @@ if ipinfo_result["ok"] and ipinfo_privacy:
     if raw is not None:
         ipinfo_says_vpn = bool(raw)
 
-if vpnapi_says_vpn is not None and ipinfo_says_vpn is not None:
-    vpn_consensus: bool | str = (
-        vpnapi_says_vpn if vpnapi_says_vpn == ipinfo_says_vpn else "Conflicting Sources"
-    )
-elif vpnapi_says_vpn is not None:
-    vpn_consensus = vpnapi_says_vpn
-elif ipinfo_says_vpn is not None:
-    vpn_consensus = ipinfo_says_vpn
+ipapiis_says_vpn: bool | None = None
+if ipapiis_result["ok"] and isinstance(ipapiis_data, dict):
+    raw = ipapiis_data.get("is_vpn")
+    if raw is not None:
+        ipapiis_says_vpn = bool(raw)
+
+_vpn_opinions = [v for v in (vpnapi_says_vpn, ipinfo_says_vpn, ipapiis_says_vpn) if v is not None]
+if not _vpn_opinions:
+    vpn_consensus: bool | str = "Data Unavailable"
+elif len(_vpn_opinions) == 1:
+    vpn_consensus = _vpn_opinions[0]
 else:
-    vpn_consensus = "Data Unavailable"
+    _true = sum(1 for v in _vpn_opinions if v)
+    _false = len(_vpn_opinions) - _true
+    vpn_consensus = "Conflicting Sources" if _true == _false else _true > _false
 
 score = abuse.get("abuseConfidenceScore", "Data Unavailable")
 score_display = f"{score}%" if isinstance(score, (int, float)) else score
@@ -580,22 +604,8 @@ sources_column, export_column = st.columns([1.15, 0.85], gap="small")
 with sources_column:
     st.markdown('<div class="section-label">SOURCE TRIAGE</div>', unsafe_allow_html=True)
     r1c1, r1c2, r1c3 = st.columns(3, gap="small")
-    r2c1, r2c2, r2c3 = st.columns(3, gap="small")
+    r2c1, r2c2, r2c3, r2c4 = st.columns(4, gap="small")
     with r1c1:
-        st.markdown(
-            source_card(
-                "VIRUSTOTAL v3",
-                vt_result,
-                [
-                    ("Malicious", value(vt_stats, "malicious")),
-                    ("Suspicious", value(vt_stats, "suspicious")),
-                    ("AS Owner", value(vt_attributes, "as_owner")),
-                ],
-                pivot_urls["vt"],
-            ),
-            unsafe_allow_html=True,
-        )
-    with r1c2:
         st.markdown(
             source_card(
                 "ABUSEIPDB v2",
@@ -606,6 +616,20 @@ with sources_column:
                     ("ISP", provider),
                 ],
                 pivot_urls["abuse"],
+            ),
+            unsafe_allow_html=True,
+        )
+    with r1c2:
+        st.markdown(
+            source_card(
+                "VIRUSTOTAL v3",
+                vt_result,
+                [
+                    ("Malicious", value(vt_stats, "malicious")),
+                    ("Suspicious", value(vt_stats, "suspicious")),
+                    ("AS Owner", value(vt_attributes, "as_owner")),
+                ],
+                pivot_urls["vt"],
             ),
             unsafe_allow_html=True,
         )
@@ -640,23 +664,37 @@ with sources_column:
     with r2c2:
         st.markdown(
             source_card(
-                "IPINFO.io",
-                ipinfo_result,
+                "IPAPI.IS",
+                ipapiis_result,
                 [
-                    ("Org", value(ipinfo_data, "org")),
-                    ("Country", value(ipinfo_data, "country")),
-                    ("VPN (privacy)", value(ipinfo_privacy, "vpn") if ipinfo_privacy else "N/A (no add-on)"),
+                    ("VPN", value(ipapiis_data, "is_vpn")),
+                    ("Proxy", value(ipapiis_data, "is_proxy")),
+                    ("TOR", value(ipapiis_data, "is_tor")),
                 ],
-                pivot_urls["ipinfo"],
+                pivot_urls["ipapiis"],
             ),
             unsafe_allow_html=True,
         )
     with r2c3:
         st.markdown(
             source_card(
+                "IPINFO.io",
+                ipinfo_result,
+                [
+                    ("Org", value(ipinfo_data, "org")),
+                    ("Country", value(ipinfo_data, "country")),
+                    ("VPN", "Manual — open web link"),
+                ],
+                pivot_urls["ipinfo"],
+            ),
+            unsafe_allow_html=True,
+        )
+    with r2c4:
+        st.markdown(
+            source_card(
                 "SPUR.US",
                 SPUR_MANUAL,
-                [("Note", "Open web link — no API")],
+                [("VPN", "Manual — open web link")],
                 pivot_urls["spur"],
             ),
             unsafe_allow_html=True,
