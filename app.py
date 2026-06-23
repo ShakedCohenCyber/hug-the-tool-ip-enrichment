@@ -303,6 +303,16 @@ def query_vpnapi(ip: str, api_key: str | None) -> dict[str, Any]:
     )
 
 
+def query_ipinfo(ip: str, api_key: str | None) -> dict[str, Any]:
+    if not api_key:
+        return unavailable("API Key Missing")
+    return request_json(
+        f"https://ipinfo.io/{quote(ip, safe='')}/json",
+        params={"token": api_key},
+        headers={"Accept": "application/json"},
+    )
+
+
 @st.cache_data(ttl=300, max_entries=256, show_spinner=False)
 def run_enrichment(
     ip: str,
@@ -314,6 +324,7 @@ def run_enrichment(
         "abuse": lambda: (query_abuseipdb, (ip, secret("ABUSE_API_KEY"))),
         "otx": lambda: (query_otx, (ip, ip_version, secret("OTX_API_KEY"))),
         "vpn": lambda: (query_vpnapi, (ip, secret("VPNAPI_KEY"))),
+        "ipinfo": lambda: (query_ipinfo, (ip, secret("IPINFO_TOKEN"))),
     }
     jobs = {name: all_jobs[name]() for name in selected_apis}
     results = {
@@ -353,7 +364,12 @@ def status_text(result: dict[str, Any]) -> str:
         return '<span class="ok">AVAILABLE</span>'
     if result["reason"] == "Not Selected":
         return '<span class="skip">NOT SELECTED</span>'
+    if result["reason"] == "Manual Check":
+        return '<span class="skip">MANUAL CHECK</span>'
     return f'<span class="bad">Data Unavailable ({safe_text(result["reason"])})</span>'
+
+
+SPUR_MANUAL: dict[str, Any] = {"ok": False, "data": {}, "reason": "Manual Check"}
 
 
 def source_card(
@@ -410,7 +426,7 @@ with st.form("ip_lookup", clear_on_submit=False):
         )
     with button_column:
         submitted = st.form_submit_button("RUN TRIAGE", use_container_width=True)
-    vt_column, abuse_column, otx_column, vpn_column = st.columns(4)
+    vt_column, abuse_column, otx_column, vpn_column, ipinfo_column = st.columns(5)
     with vt_column:
         use_vt = st.checkbox("VirusTotal", value=False)
     with abuse_column:
@@ -419,6 +435,8 @@ with st.form("ip_lookup", clear_on_submit=False):
         use_otx = st.checkbox("AlienVault OTX", value=True)
     with vpn_column:
         use_vpn = st.checkbox("VPNAPI.io", value=True)
+    with ipinfo_column:
+        use_ipinfo = st.checkbox("IPInfo.io", value=True)
 
 if not submitted:
     st.markdown(
@@ -440,6 +458,7 @@ selected_apis = tuple(
         ("abuse", use_abuse),
         ("otx", use_otx),
         ("vpn", use_vpn),
+        ("ipinfo", use_ipinfo),
     )
     if enabled
 )
@@ -464,9 +483,10 @@ selected_names = {
     "abuse": "ABUSEIPDB",
     "otx": "OTX",
     "vpn": "VPNAPI",
+    "ipinfo": "IPINFO",
 }
 spinner_sources = " / ".join(
-    selected_names[name] for name in ("vt", "abuse", "otx", "vpn") if name in selected_apis
+    selected_names[name] for name in ("vt", "abuse", "otx", "vpn", "ipinfo") if name in selected_apis
 )
 with st.spinner(f"CONTACTING {spinner_sources} ..."):
     api_results = run_enrichment(ip_address, ip_object.version, selected_apis)
@@ -477,12 +497,15 @@ pivot_urls = {
     "abuse": f"https://www.abuseipdb.com/check/{encoded_ip}",
     "otx": f"https://otx.alienvault.com/indicator/ip/{encoded_ip}",
     "vpn": "https://vpnapi.io/vpn-detection",
+    "ipinfo": f"https://ipinfo.io/{encoded_ip}",
+    "spur": f"https://spur.us/context/{encoded_ip}",
 }
 
 vt_result = api_results["vt"]
 abuse_result = api_results["abuse"]
 otx_result = api_results["otx"]
 vpn_result = api_results["vpn"]
+ipinfo_result = api_results["ipinfo"]
 
 vt_data = vt_result["data"].get("data", {}) if vt_result["ok"] else {}
 vt_attributes = vt_data.get("attributes", {}) if isinstance(vt_data, dict) else {}
@@ -493,6 +516,10 @@ otx_reputation = value(otx_result["data"], "reputation") if otx_result["ok"] els
 vpn_security = vpn_result["data"].get("security", {}) if vpn_result["ok"] else {}
 if not isinstance(vpn_security, dict):
     vpn_security = {}
+ipinfo_data = ipinfo_result["data"] if ipinfo_result["ok"] else {}
+ipinfo_privacy = ipinfo_data.get("privacy", {}) if isinstance(ipinfo_data, dict) else {}
+if not isinstance(ipinfo_privacy, dict):
+    ipinfo_privacy = {}
 
 if abuse_result["ok"]:
     abuse = dict(abuse_result["data"])
@@ -507,11 +534,29 @@ else:
         "domain": "Data Unavailable",
     }
 
-vpn = (
-    {"vpn": value(vpn_security, "vpn", False)}
-    if vpn_result["ok"] and isinstance(vpn_security, dict)
-    else {"vpn": "Data Unavailable"}
-)
+vpnapi_says_vpn: bool | None = None
+if vpn_result["ok"] and isinstance(vpn_security, dict):
+    raw = vpn_security.get("vpn")
+    if raw is not None:
+        vpnapi_says_vpn = bool(raw)
+
+ipinfo_says_vpn: bool | None = None
+if ipinfo_result["ok"] and ipinfo_privacy:
+    raw = ipinfo_privacy.get("vpn")
+    if raw is not None:
+        ipinfo_says_vpn = bool(raw)
+
+if vpnapi_says_vpn is not None and ipinfo_says_vpn is not None:
+    vpn_consensus: bool | str = (
+        vpnapi_says_vpn if vpnapi_says_vpn == ipinfo_says_vpn else "Conflicting Sources"
+    )
+elif vpnapi_says_vpn is not None:
+    vpn_consensus = vpnapi_says_vpn
+elif ipinfo_says_vpn is not None:
+    vpn_consensus = ipinfo_says_vpn
+else:
+    vpn_consensus = "Data Unavailable"
+
 score = abuse.get("abuseConfidenceScore", "Data Unavailable")
 score_display = f"{score}%" if isinstance(score, (int, float)) else score
 provider = abuse.get("isp", "Data Unavailable")
@@ -528,15 +573,15 @@ payload = {
         else "Data Unavailable"
     ),
     "Domain": abuse.get("domain", "N/A"),
-    "VPN": vpn.get("vpn", False),
+    "VPN": vpn_consensus,
 }
 
 sources_column, export_column = st.columns([1.15, 0.85], gap="small")
 with sources_column:
     st.markdown('<div class="section-label">SOURCE TRIAGE</div>', unsafe_allow_html=True)
-    top_left, top_right = st.columns(2, gap="small")
-    bottom_left, bottom_right = st.columns(2, gap="small")
-    with top_left:
+    r1c1, r1c2, r1c3 = st.columns(3, gap="small")
+    r2c1, r2c2, r2c3 = st.columns(3, gap="small")
+    with r1c1:
         st.markdown(
             source_card(
                 "VIRUSTOTAL v3",
@@ -550,7 +595,7 @@ with sources_column:
             ),
             unsafe_allow_html=True,
         )
-    with top_right:
+    with r1c2:
         st.markdown(
             source_card(
                 "ABUSEIPDB v2",
@@ -564,7 +609,7 @@ with sources_column:
             ),
             unsafe_allow_html=True,
         )
-    with bottom_left:
+    with r1c3:
         st.markdown(
             source_card(
                 "ALIENVAULT OTX",
@@ -578,7 +623,7 @@ with sources_column:
             ),
             unsafe_allow_html=True,
         )
-    with bottom_right:
+    with r2c1:
         st.markdown(
             source_card(
                 "VPNAPI.io",
@@ -589,6 +634,30 @@ with sources_column:
                     ("TOR", value(vpn_security, "tor")),
                 ],
                 pivot_urls["vpn"],
+            ),
+            unsafe_allow_html=True,
+        )
+    with r2c2:
+        st.markdown(
+            source_card(
+                "IPINFO.io",
+                ipinfo_result,
+                [
+                    ("Org", value(ipinfo_data, "org")),
+                    ("Country", value(ipinfo_data, "country")),
+                    ("VPN (privacy)", value(ipinfo_privacy, "vpn") if ipinfo_privacy else "N/A (no add-on)"),
+                ],
+                pivot_urls["ipinfo"],
+            ),
+            unsafe_allow_html=True,
+        )
+    with r2c3:
+        st.markdown(
+            source_card(
+                "SPUR.US",
+                SPUR_MANUAL,
+                [("Note", "Open web link — no API")],
+                pivot_urls["spur"],
             ),
             unsafe_allow_html=True,
         )
