@@ -27,22 +27,51 @@ st.markdown(
     """
     <style>
     :root {
-        color-scheme: light;
+        --bg:           #090d18;
+        --surface:      #0f1624;
+        --border:       rgba(0, 212, 255, 0.1);
+        --border-hi:    rgba(0, 212, 255, 0.35);
+        --cyan:         #00d4ff;
+        --cyan-dim:     rgba(0, 212, 255, 0.5);
+        --green:        #00e676;
+        --red:          #ff5252;
+        --text:         #b8c8d8;
+        --text-dim:     #4a6070;
+        color-scheme: dark;
     }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes titleGlow {
+        0%,100% { box-shadow: 0 0 14px rgba(0,212,255,0.15), inset 0 0 30px rgba(0,212,255,0.03); }
+        50%     { box-shadow: 0 0 32px rgba(0,212,255,0.32), inset 0 0 40px rgba(0,212,255,0.07); }
+    }
+    @keyframes shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+    }
+    @keyframes scanPulse {
+        0%,100% { opacity: 0.5; }
+        50%     { opacity: 1; }
+    }
+    @keyframes cardBorderFlash {
+        0%,100% { border-top-color: rgba(0,212,255,0.18); }
+        50%     { border-top-color: rgba(0,212,255,0.55); }
+    }
+
     html, body, [data-testid="stAppViewContainer"], .stApp {
         height: 100vh;
         overflow: hidden;
-        background-color: #b9c4d4;
+        background-color: var(--bg);
         background-image:
-            radial-gradient(circle at 12% 18%, rgba(0, 255, 255, 0.42) 0 2px, transparent 3px),
-            radial-gradient(circle at 88% 72%, rgba(255, 0, 255, 0.28) 0 2px, transparent 3px),
-            linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
-            linear-gradient(135deg, #aab5c8 0%, #e6f7ff 38%, #a6b0c3 70%, #d9c9ff 100%);
-        background-size: 83px 83px, 109px 109px, 24px 24px, 24px 24px, cover;
+            linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+        background-size: 44px 44px;
         background-attachment: fixed;
-        color: #000080;
-        font-family: Verdana, Arial, sans-serif;
+        color: var(--text);
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
     }
     [data-testid="stHeader"], [data-testid="stToolbar"], footer {
         display: none !important;
@@ -52,127 +81,209 @@ st.markdown(
         height: 100vh;
         padding: 0.55rem 1rem 0.35rem !important;
     }
-    h1, h2, h3, p {
-        margin: 0;
-    }
+    h1, h2, h3, p { margin: 0; }
+
+    /* ── Title ── */
     .retro-title {
-        background: #000080;
-        color: #ffff00;
-        border: 3px outset #dfdfdf;
-        font: bold 20px "Courier New", monospace;
-        letter-spacing: 1px;
-        padding: 7px 12px;
-        text-shadow: 1px 1px #000;
+        background: linear-gradient(135deg, #0d1b2e 0%, #09111f 100%);
+        border: 1px solid var(--border-hi);
+        border-left: 3px solid var(--cyan);
+        color: var(--cyan);
+        font: bold 17px "Courier New", monospace;
+        letter-spacing: 4px;
+        padding: 10px 16px;
+        text-transform: uppercase;
+        position: relative;
+        overflow: hidden;
+        animation: titleGlow 4s ease-in-out infinite;
     }
+    .retro-title::after {
+        content: '';
+        position: absolute;
+        left: 0; right: 0; bottom: 0; height: 1px;
+        background: linear-gradient(90deg, transparent 0%, var(--cyan) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 3s linear infinite;
+    }
+
+    /* ── Subtitle ── */
     .retro-subtitle {
-        background: #ffffcc;
-        border: 2px inset #fff;
-        color: #000;
-        font: 11px Verdana, sans-serif;
-        padding: 3px 8px;
+        background: transparent;
+        border: none;
+        border-left: 2px solid var(--border-hi);
+        color: var(--text-dim);
+        font: 10px "Courier New", monospace;
+        letter-spacing: 2px;
+        padding: 3px 10px;
         margin-bottom: 5px;
     }
+
+    /* ── Form ── */
     [data-testid="stForm"] {
-        background: #d4d0c8;
-        border: 2px outset #fff;
-        padding: 5px 8px 1px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 2px solid rgba(0,212,255,0.15);
+        padding: 8px 10px 4px;
     }
     [data-testid="stTextInput"] label {
-        color: #000;
-        font: bold 11px Verdana, sans-serif;
+        color: var(--cyan) !important;
+        font: bold 10px "Courier New", monospace !important;
+        letter-spacing: 2px;
+        text-transform: uppercase;
     }
     [data-testid="stTextInput"] input {
-        height: 34px;
-        background: #fff;
-        border: 2px inset #fff;
-        border-radius: 0;
-        color: #000;
-        font: 14px "Courier New", monospace;
+        height: 36px;
+        background: #050810 !important;
+        border: 1px solid rgba(0,212,255,0.2) !important;
+        border-radius: 1px !important;
+        color: var(--cyan) !important;
+        font: 14px "Courier New", monospace !important;
+        transition: border-color 0.25s, box-shadow 0.25s;
     }
-    [data-testid="stCheckbox"] {
-        min-height: 25px;
+    [data-testid="stTextInput"] input:focus {
+        border-color: var(--cyan) !important;
+        box-shadow: 0 0 0 1px rgba(0,212,255,0.15), 0 0 14px rgba(0,212,255,0.1) !important;
+        outline: none !important;
     }
+    [data-testid="stTextInput"] input::placeholder {
+        color: var(--text-dim) !important;
+    }
+
+    /* ── Checkboxes ── */
+    [data-testid="stCheckbox"] { min-height: 25px; }
     [data-testid="stCheckbox"] label {
-        color: #000080 !important;
-        font: bold 11px Verdana, sans-serif;
+        color: var(--text-dim) !important;
+        font: 10px "Courier New", monospace !important;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: color 0.2s;
     }
-    [data-testid="stCheckbox"] label p {
-        color: #000080 !important;
-    }
+    [data-testid="stCheckbox"] label p { color: var(--text-dim) !important; }
+    [data-testid="stCheckbox"] label:has(input:checked) { color: var(--cyan) !important; }
+    [data-testid="stCheckbox"] label:has(input:checked) p { color: var(--cyan) !important; }
     [data-testid="stCheckbox"] label:has(input:checked) > span {
-        background-color: #000080 !important;
-        border-color: #000080 !important;
+        background-color: var(--cyan) !important;
+        border-color: var(--cyan) !important;
     }
     [data-testid="stCheckbox"] label:has(input:focus-visible) > span {
-        box-shadow: 0 0 0 2px #00ffff !important;
+        box-shadow: 0 0 0 2px rgba(0,212,255,0.35) !important;
     }
+
+    /* ── Button ── */
     .stButton > button, [data-testid="stFormSubmitButton"] button {
-        min-height: 34px;
-        border: 2px outset #fff;
-        border-radius: 0;
-        background: #d4d0c8;
-        color: #000;
-        font: bold 12px Verdana, sans-serif;
+        min-height: 36px;
+        border: 1px solid var(--border-hi) !important;
+        border-radius: 2px !important;
+        background: rgba(0,212,255,0.06) !important;
+        color: var(--cyan) !important;
+        font: bold 11px "Courier New", monospace !important;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        transition: background 0.25s, box-shadow 0.25s;
+    }
+    .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover {
+        background: rgba(0,212,255,0.14) !important;
+        box-shadow: 0 0 18px rgba(0,212,255,0.25) !important;
     }
     .stButton > button:active, [data-testid="stFormSubmitButton"] button:active {
-        border-style: inset;
+        background: rgba(0,212,255,0.22) !important;
     }
+
+    /* ── Section label ── */
     .section-label {
-        background: #808080;
-        border: 2px outset #fff;
-        color: #fff;
-        font: bold 12px Verdana, sans-serif;
-        padding: 3px 7px;
-        margin: 4px 0;
+        background: transparent;
+        border-bottom: 1px solid var(--border);
+        border-left: 2px solid var(--cyan);
+        color: var(--cyan);
+        font: bold 10px "Courier New", monospace;
+        letter-spacing: 3px;
+        padding: 4px 10px;
+        margin: 6px 0;
+        text-transform: uppercase;
     }
+
+    /* ── Source cards ── */
     .source-card {
         min-height: 91px;
-        background: #f0f0e8;
-        border: 2px outset #fff;
-        color: #000;
-        font: 11px Verdana, sans-serif;
-        line-height: 1.45;
-        padding: 5px 7px;
-        margin-bottom: 5px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-top: 2px solid rgba(0,212,255,0.18);
+        color: var(--text);
+        font: 11px "Courier New", monospace;
+        line-height: 1.55;
+        padding: 0 8px 6px;
+        margin-bottom: 6px;
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+        animation: fadeInUp 0.4s ease both;
     }
-    .source-card b {
-        color: #000080;
+    .source-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(0,212,255,0.03) 0%, transparent 55%);
+        pointer-events: none;
     }
+    .source-card:hover {
+        border-color: rgba(0,212,255,0.4);
+        border-top-color: var(--cyan);
+        box-shadow: 0 4px 24px rgba(0,212,255,0.09);
+        transform: translateY(-2px);
+    }
+    /* stagger card entrance per column */
+    [data-testid="column"]:nth-child(1) .source-card { animation-delay:   0ms; }
+    [data-testid="column"]:nth-child(2) .source-card { animation-delay:  70ms; }
+    [data-testid="column"]:nth-child(3) .source-card { animation-delay: 140ms; }
+    [data-testid="column"]:nth-child(4) .source-card { animation-delay: 210ms; }
+
+    .source-card b { color: var(--text-dim); font-weight: normal; }
+
+    /* ── Card title bar ── */
     .source-title {
-        background: #000080;
-        color: #fff;
-        font: bold 11px "Courier New", monospace;
-        margin: -5px -7px 4px;
-        padding: 2px 5px;
+        background: linear-gradient(90deg, rgba(0,212,255,0.1) 0%, transparent 80%);
+        border-bottom: 1px solid var(--border);
+        border-left: 2px solid var(--cyan);
+        color: var(--cyan);
+        font: bold 9px "Courier New", monospace;
+        letter-spacing: 2px;
+        margin: 0 -8px 6px;
+        padding: 4px 8px;
+        text-transform: uppercase;
     }
-    .ok {
-        color: #006400;
-        font-weight: bold;
-    }
-    .bad {
-        color: #a00000;
-        font-weight: bold;
-    }
-    .skip {
-        color: #505050;
-        font-weight: bold;
-    }
+
+    /* ── Status badges ── */
+    .ok   { color: var(--green); font-weight: bold; letter-spacing: 0.5px; }
+    .bad  { color: var(--red);   font-weight: bold; letter-spacing: 0.5px; }
+    .skip { color: var(--text-dim); }
+
+    /* ── Pivot link ── */
     .pivot-link {
         float: right;
-        color: #0000ee;
-        font: bold 10px Verdana, sans-serif;
-        text-decoration: underline;
+        color: var(--cyan-dim);
+        font: 9px "Courier New", monospace;
+        text-decoration: none;
+        letter-spacing: 1px;
+        border: 1px solid rgba(0,212,255,0.2);
+        padding: 1px 5px;
+        transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
-    .pivot-link:visited {
-        color: #551a8b;
+    .pivot-link:hover {
+        color: var(--cyan);
+        border-color: var(--cyan);
+        box-shadow: 0 0 8px rgba(0,212,255,0.2);
     }
+    .pivot-link:visited { color: rgba(140,90,210,0.6); }
+
+    /* ── Code block ── */
     [data-testid="stCodeBlock"] {
-        border: 2px inset #fff;
-        border-radius: 0;
+        border: 1px solid var(--border);
+        border-radius: 2px;
     }
     [data-testid="stCodeBlock"] pre {
         max-height: 275px;
         font-size: 11px;
+        background: #050810 !important;
     }
     [data-testid="stCode"] [data-testid="stElementToolbarButton"],
     [data-testid="stCode"] [data-testid="stTooltipHoverTarget"] {
@@ -181,25 +292,34 @@ st.markdown(
     }
     [data-testid="stCode"] [data-testid="stBaseButton-elementToolbar"] {
         width: auto !important;
-        min-height: 28px !important;
-        padding: 2px 6px !important;
-        background: #d4d0c8 !important;
-        border: 2px outset #fff !important;
-        border-radius: 0 !important;
-        color: #000 !important;
-        font: bold 10px Verdana, sans-serif !important;
+        min-height: 26px !important;
+        padding: 2px 8px !important;
+        background: rgba(0,212,255,0.08) !important;
+        border: 1px solid rgba(0,212,255,0.25) !important;
+        border-radius: 2px !important;
+        color: var(--cyan) !important;
+        font: bold 9px "Courier New", monospace !important;
+        letter-spacing: 1px !important;
     }
     [data-testid="stCode"] [data-testid="stBaseButton-elementToolbar"]::after {
         content: " COPY TO CLIPBOARD";
     }
+
+    /* ── Alerts ── */
     [data-testid="stAlert"] {
-        border-radius: 0;
-        border: 2px outset #fff;
-        padding: 6px 10px;
-        font: bold 12px Verdana, sans-serif;
+        border-radius: 2px;
+        padding: 6px 12px;
+        font: bold 11px "Courier New", monospace;
+        letter-spacing: 1px;
+        background: var(--surface) !important;
     }
+
+    /* ── Spinner ── */
     [data-testid="stSpinner"] {
-        font: bold 12px "Courier New", monospace;
+        font: bold 11px "Courier New", monospace;
+        color: var(--cyan) !important;
+        letter-spacing: 2px;
+        animation: scanPulse 1.2s ease-in-out infinite;
     }
     </style>
     """,
